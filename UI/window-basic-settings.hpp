@@ -195,6 +195,8 @@ private:
 
 	void LoadGeneralSettings();
 	void LoadStream1Settings();
+	void LoadStream2Settings();
+ 	void LoadStream3Settings();
 	void LoadOutputSettings();
 	void LoadAudioSettings();
 	void LoadVideoSettings();
@@ -235,6 +237,8 @@ private:
 
 	void SaveGeneralSettings();
 	void SaveStream1Settings();
+	void SaveStream2Settings();
+	void SaveStream3Settings();
 	void SaveOutputSettings();
 	void SaveAudioSettings();
 	void SaveVideoSettings();
@@ -287,6 +291,8 @@ private slots:
 	void SpeakerLayoutChanged(int idx);
 	void OutputsChanged();
 	void Stream1Changed();
+	void Stream2Changed();
+	void Stream3Changed();
 	void VideoChanged();
 	void VideoChangedResolution();
 	void VideoChangedRestart();
