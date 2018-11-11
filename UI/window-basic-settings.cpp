@@ -1164,6 +1164,7 @@ void OBSBasicSettings::LoadGeneralSettings()
 					"MultiviewLayout"));
 
 	loading = false;
+
 }
 
 void OBSBasicSettings::LoadStream1Settings()
@@ -1174,28 +1175,70 @@ void OBSBasicSettings::LoadStream1Settings()
 
 	loading = true;
 
-	obs_data_t *settings = obs_service_get_settings(service);
+	const char *type = obs_service_get_type(service[0]);
+	obs_data_t *settings = obs_service_get_settings(service[0]);
+	delete streamProperties[0];
+	streamProperties[0] = new OBSPropertiesView(settings, type,(PropertiesReloadCallback)obs_get_service_properties,170);
 
-	delete streamProperties;
-	streamProperties = new OBSPropertiesView(settings, type,
-			(PropertiesReloadCallback)obs_get_service_properties,
-			170);
+	streamProperties[0]->setProperty("changed", QVariant(false));
+	layout->addWidget(streamProperties[0]);
 
-	streamProperties->setProperty("changed", QVariant(false));
-	layout->addWidget(streamProperties);
-
-	QObject::connect(streamProperties, SIGNAL(Changed()),
-			this, STREAM1_CHANGED);
-
+	QObject::connect(streamProperties[0], SIGNAL(Changed()),this, STREAM1_CHANGED);
 	obs_data_release(settings);
 
 	loading = false;
 
 	if (main->StreamingActive()) {
-		ui->streamType->setEnabled(false);
+		ui->streamType1->setEnabled(false);
 		ui->streamContainer->setEnabled(false);
 	}
 }
+
+void OBSBasicSettings::LoadStream2Settings()
+{
+	printf("**************OBSBasicSettings::LoadStream2Settings()**************** \n");
+	printf("****	here is where the stream properties widgets are created****** \n");
+	printf("********************************************************************* \n");
+	QLayout *layout = ui->streamContainer->layout();
+	obs_service_t ** service = main->GetService();
+	loading = true;
+ 	const char *type = obs_service_get_type(service[1]);
+	obs_data_t *settings = obs_service_get_settings(service[1]);
+	delete streamProperties[1];
+	streamProperties[1] = new OBSPropertiesView(settings, type,(PropertiesReloadCallback)obs_get_service_properties,170);
+ 	streamProperties[1]->setProperty("changed", QVariant(false));
+	layout->addWidget(streamProperties[1]);
+ 	QObject::connect(streamProperties[1], SIGNAL(Changed()),this, STREAM2_CHANGED);
+	obs_data_release(settings);
+ 	loading = false;
+ 	if (main->StreamingActive()) {
+		ui->streamType2->setEnabled(false);
+		ui->streamContainer->setEnabled(false);
+	}
+}
+ void OBSBasicSettings::LoadStream3Settings()
+{
+	printf("**************OBSBasicSettings::LoadStream3Settings()**************** \n");
+	printf("****	here is where the stream properties widgets are created****** \n");
+	printf("********************************************************************* \n");
+	QLayout *layout = ui->streamContainer->layout();
+	obs_service_t ** service = main->GetService();
+	loading = true;
+ 	const char *type = obs_service_get_type(service[2]);
+	obs_data_t *settings = obs_service_get_settings(service[2]);
+	delete streamProperties[2];
+	streamProperties[2] = new OBSPropertiesView(settings, type,(PropertiesReloadCallback)obs_get_service_properties,170);
+ 	streamProperties[2]->setProperty("changed", QVariant(false));
+	layout->addWidget(streamProperties[2]);
+ 	QObject::connect(streamProperties[2], SIGNAL(Changed()),this, STREAM3_CHANGED);
+	obs_data_release(settings);
+ 	loading = false;
+ 	if (main->StreamingActive()) {
+		ui->streamType3->setEnabled(false);
+		ui->streamContainer->setEnabled(false);
+	}
+}
+
 
 void OBSBasicSettings::LoadRendererList()
 {
@@ -1384,6 +1427,7 @@ void OBSBasicSettings::LoadResolutionLists()
 	}
 
 	addRes(1920, 1080);
+	addRes(800, 450); //nicolive
 	addRes(1280, 720);
 
 	string outputResString = ResString(out_cx, out_cy);
@@ -1904,9 +1948,22 @@ void OBSBasicSettings::LoadOutputSettings()
 	loading = true;
 
 	const char *mode = config_get_string(main->Config(), "Output", "Mode");
+	//const char *mode1 = config_get_string(main->Config(), "Output", "Mode1");
+	//const char *mode2 = config_get_string(main->Config(), "Output", "Mode2");
+	//const char *mode3 = config_get_string(main->Config(), "Output", "Mode3");
+	const char *recmode = config_get_string(main->Config(), "Output", "RecMode");
 
 	int modeIdx = astrcmpi(mode, "Advanced") == 0 ? 1 : 0;
+	//int modeIdx1 = astrcmpi(mode, "Advanced") == 0 ? 1 : 0;
+	//int modeIdx2 = astrcmpi(mode, "Advanced") == 0 ? 1 : 0;
+	//int modeIdx3 = astrcmpi(mode, "Advanced") == 0 ? 1 : 0;
+	int recmodeIdx = astrcmpi(recmode, "Advanced") == 0 ? 1 : 0;
+
 	ui->outputMode->setCurrentIndex(modeIdx);
+	//ui->outputMode1->setCurrentIndex(modeIdx1);
+	//ui->outputMode2->setCurrentIndex(modeIdx2);
+	//ui->outputMode3->setCurrentIndex(modeIdx3);
+	ui->recordingMode->setCurrentIndex(recmodeIdx);
 
 	LoadSimpleOutputSettings();
 	LoadAdvOutputStreamingSettings();
@@ -1918,7 +1975,14 @@ void OBSBasicSettings::LoadOutputSettings()
 
 	if (video_output_active(obs_get_video())) {
 		ui->outputMode->setEnabled(false);
+		//ui->outputMode1->setEnabled(false);
+		//ui->outputMode2->setEnabled(false);
+		//ui->outputMode3->setEnabled(false);
+		ui->recordingMode->setEnabled(false);
 		ui->outputModeLabel->setEnabled(false);
+		//ui->outputModeLabel1->setEnabled(false);
+		//ui->outputModeLabel2->setEnabled(false);
+		//ui->outputModeLabel3->setEnabled(false);
 		ui->simpleRecordingGroupBox->setEnabled(false);
 		ui->replayBufferGroupBox->setEnabled(false);
 		ui->advOutTopContainer->setEnabled(false);
@@ -2669,6 +2733,10 @@ void OBSBasicSettings::LoadSettings(bool changedOnly)
 		LoadGeneralSettings();
 	if (!changedOnly || stream1Changed)
 		LoadStream1Settings();
+	if (!changedOnly || stream2Changed)
+		LoadStream2Settings();
+	if (!changedOnly || stream3Changed)
+		LoadStream3Settings();	
 	if (!changedOnly || outputsChanged)
 		LoadOutputSettings();
 	if (!changedOnly || audioChanged)
@@ -2832,13 +2900,15 @@ void OBSBasicSettings::SaveGeneralSettings()
 
 void OBSBasicSettings::SaveStream1Settings()
 {
-	QString streamType = GetComboData(ui->streamType);
+	printf("********************OBSBasicSettings::SaveStream1Settings()***************** \n");
+
+	QString streamType = GetComboData(ui->streamType1);
 
 	obs_service_t *oldService = main->GetService();
 	obs_data_t *hotkeyData = obs_hotkeys_save_service(oldService);
 
-	obs_service_t *newService = obs_service_create(QT_TO_UTF8(streamType),
-			"default_service", streamProperties->GetSettings(),
+	newService[0] = obs_service_create(QT_TO_UTF8(streamType),
+			"default_service", streamProperties[0]->GetSettings(),
 			hotkeyData);
 
 	obs_data_release(hotkeyData);
@@ -2849,6 +2919,50 @@ void OBSBasicSettings::SaveStream1Settings()
 	main->SaveService();
 	obs_service_release(newService);
 }
+
+void OBSBasicSettings::SaveStream2Settings()
+{
+	printf("********************OBSBasicSettings::SaveStream2Settings()***************** \n");
+	QString streamType = GetComboData(ui->streamType2);
+	obs_service_t* newService[NUMBER_OF_STREAM_SERVERS];
+	obs_service_t** oldService = main->GetService();
+	obs_data_t *hotkeyData = obs_hotkeys_save_service(oldService[1]);
+
+	newService[1] = obs_service_create(QT_TO_UTF8(streamType),
+￼ 			"default_service", streamProperties[1]->GetSettings(),
+￼ 			hotkeyData);
+￼
+￼ 	obs_data_release(hotkeyData);
+￼
+￼ 	if (!newService[1])
+￼ 		continue;
+￼
+￼ 	main->SetService(newService[1] , 1);
+￼ 	main->SaveService(1);
+￼ 	obs_service_release(newService[1]);
+￼ }
+￼
+￼ void OBSBasicSettings::SaveStream3Settings()
+￼ {
+￼ 	printf("********************OBSBasicSettings::SaveStream3Settings()***************** \n");
+￼ 	QString streamType = GetComboData(ui->streamType3);
+￼ 	obs_service_t* newService[NUMBER_OF_STREAM_SERVERS];
+￼ 	obs_service_t** oldService = main->GetService();
+￼ 	obs_data_t *hotkeyData = obs_hotkeys_save_service(oldService[2]);
+￼
+￼ 	newService[2] = obs_service_create(QT_TO_UTF8(streamType),
+￼ 			"default_service", streamProperties[2]->GetSettings(),
+￼ 			hotkeyData);
+￼
+￼ 	obs_data_release(hotkeyData);
+￼
+￼ 	if (!newService[2])
+￼ 		continue;
+￼
+￼ 	main->SetService(newService[2] , 2);
+￼ 	main->SaveService(2);
+￼ 	obs_service_release(newService[2]);
+￼ }
 
 void OBSBasicSettings::SaveVideoSettings()
 {
@@ -3071,6 +3185,10 @@ void OBSBasicSettings::SaveEncoder(QComboBox *combo, const char *section,
 
 void OBSBasicSettings::SaveOutputSettings()
 {
+	//Multi Stream
+	//config_set_string(main->Config(), "Output", "Mode1",OutputModeFromIdx(ui->outputMode1->currentIndex()));
+	//config_set_string(main->Config(), "Output", "Mode2",OutputModeFromIdx(ui->outputMode2->currentIndex()));
+	//config_set_string(main->Config(), "Output", "Mode3",OutputModeFromIdx(ui->outputMode3->currentIndex()));
 	config_set_string(main->Config(), "Output", "Mode",
 			OutputModeFromIdx(ui->outputMode->currentIndex()));
 
@@ -3378,6 +3496,10 @@ void OBSBasicSettings::SaveSettings()
 			AddChangedVal(changed, "general");
 		if (stream1Changed)
 			AddChangedVal(changed, "stream 1");
+		if (stream2Changed)
+			AddChangedVal(changed, "stream 2");
+		if (stream3Changed)
+			AddChangedVal(changed, "stream 3");
 		if (outputsChanged)
 			AddChangedVal(changed, "outputs");
 		if (audioChanged)
@@ -3466,29 +3588,65 @@ void OBSBasicSettings::on_buttonBox_clicked(QAbstractButton *button)
 	}
 }
 
-void OBSBasicSettings::on_streamType_currentIndexChanged(int idx)
+void OBSBasicSettings::on_streamType1_currentIndexChanged(int idx)
 {
 	if (loading)
 		return;
 
 	QLayout *layout = ui->streamContainer->layout();
-	QString streamType = ui->streamType->itemData(idx).toString();
+	QString streamType = ui->streamType1->itemData(idx).toString();
 	obs_data_t *settings = obs_service_defaults(QT_TO_UTF8(streamType));
 
-	delete streamProperties;
-	streamProperties = new OBSPropertiesView(settings,
-			QT_TO_UTF8(streamType),
-			(PropertiesReloadCallback)obs_get_service_properties,
-			170);
+	delete streamProperties[0];
+	streamProperties[0] = new OBSPropertiesView(settings,QT_TO_UTF8(streamType),(PropertiesReloadCallback)obs_get_service_properties,170);
 
-	streamProperties->setProperty("changed", QVariant(true));
-	layout->addWidget(streamProperties);
+	streamProperties[0]->setProperty("changed", QVariant(true));
+	layout->addWidget(streamProperties[0]);
 
-	QObject::connect(streamProperties, SIGNAL(Changed()),
-			this, STREAM1_CHANGED);
-
+	QObject::connect(streamProperties[0], SIGNAL(Changed()),this, STREAM1_CHANGED);
+	
 	obs_data_release(settings);
 }
+
+void OBSBasicSettings::on_streamType2_currentIndexChanged(int idx)
+￼ {
+￼ 	if (loading)
+￼ 		return;
+￼
+￼ 	QLayout *layout = ui->streamContainer->layout();
+￼ 	QString streamType = ui->streamType2->itemData(idx).toString();
+￼ 	obs_data_t *settings = obs_service_defaults(QT_TO_UTF8(streamType));
+￼
+￼ 	delete streamProperties[1];
+￼ 	streamProperties[1] = new OBSPropertiesView(settings,QT_TO_UTF8(streamType),(PropertiesReloadCallback)obs_get_service_properties,170);
+￼
+￼ 	streamProperties[1]->setProperty("changed", QVariant(true));
+￼ 	layout->addWidget(streamProperties[1]);
+￼
+￼ 	QObject::connect(streamProperties[1], SIGNAL(Changed()),this, STREAM2_CHANGED);
+￼
+￼ 	obs_data_release(settings);
+￼ }
+￼
+￼ void OBSBasicSettings::on_streamType3_currentIndexChanged(int idx)
+￼ {
+￼ 	if (loading)
+￼ 		return;
+￼
+￼ 	QLayout *layout = ui->streamContainer->layout();
+￼ 	QString streamType = ui->streamType3->itemData(idx).toString();
+￼ 	obs_data_t *settings = obs_service_defaults(QT_TO_UTF8(streamType));
+￼
+￼ 	delete streamProperties[2];
+￼ 	streamProperties[2] = new OBSPropertiesView(settings,QT_TO_UTF8(streamType),(PropertiesReloadCallback)obs_get_service_properties,170);
+￼
+￼ 	streamProperties[2]->setProperty("changed", QVariant(true));
+￼ 	layout->addWidget(streamProperties[2]);
+￼
+￼ 	QObject::connect(streamProperties[2], SIGNAL(Changed()),this, STREAM3_CHANGED);
+￼
+￼ 	obs_data_release(settings);
+￼ }
 
 void OBSBasicSettings::on_simpleOutputBrowse_clicked()
 {
@@ -3729,6 +3887,24 @@ void OBSBasicSettings::Stream1Changed()
 		EnableApplyButton(true);
 	}
 }
+
+void OBSBasicSettings::Stream2Changed()
+￼ {
+￼ 	if (!loading) {
+￼ 		stream2Changed = true;
+￼ 		sender()->setProperty("changed", QVariant(true));
+￼ 		EnableApplyButton(true);
+￼ 	}
+￼ }
+￼
+￼ void OBSBasicSettings::Stream3Changed()
+￼ {
+￼ 	if (!loading) {
+￼ 		stream3Changed = true;
+￼ 		sender()->setProperty("changed", QVariant(true));
+￼ 		EnableApplyButton(true);
+￼ 	}
+￼ }
 
 void OBSBasicSettings::OutputsChanged()
 {
@@ -4339,7 +4515,7 @@ void OBSBasicSettings::SimpleRecordingEncoderChanged()
 	OBSService service;
 
 	if (stream1Changed) {
-		QString streamType = GetComboData(ui->streamType);
+		QString streamType = GetComboData(ui->streamType1);
 		service = obs_service_create_private(
 				QT_TO_UTF8(streamType), nullptr,
 				streamProperties->GetSettings());
