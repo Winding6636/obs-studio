@@ -264,6 +264,8 @@ void OBSBasicSettings::HookWidget(QWidget *widget, const char *signal,
 
 #define GENERAL_CHANGED SLOT(GeneralChanged())
 #define STREAM1_CHANGED SLOT(Stream1Changed())
+#define STREAM2_CHANGED SLOT(Stream2Changed())
+#define STREAM3_CHANGED SLOT(Stream3Changed())
 #define OUTPUTS_CHANGED SLOT(OutputsChanged())
 #define AUDIO_RESTART   SLOT(AudioChangedRestart())
 #define AUDIO_CHANGED   SLOT(AudioChanged())
@@ -323,7 +325,10 @@ OBSBasicSettings::OBSBasicSettings(QWidget *parent)
 	HookWidget(ui->multiviewDrawAreas,   CHECK_CHANGED,  GENERAL_CHANGED);
 	HookWidget(ui->multiviewLayout,      COMBO_CHANGED,  GENERAL_CHANGED);
 	HookWidget(ui->outputMode,           COMBO_CHANGED,  OUTPUTS_CHANGED);
-	HookWidget(ui->streamType,           COMBO_CHANGED,  STREAM1_CHANGED);
+	//HookWidget(ui->streamType,           COMBO_CHANGED,  STREAM1_CHANGED);
+	HookWidget(ui->streamType1,           COMBO_CHANGED,  STREAM1_CHANGED);
+	HookWidget(ui->streamType2,           COMBO_CHANGED,  STREAM2_CHANGED);
+	HookWidget(ui->streamType3,           COMBO_CHANGED,  STREAM3_CHANGED);
 	HookWidget(ui->simpleOutputPath,     EDIT_CHANGED,   OUTPUTS_CHANGED);
 	HookWidget(ui->simpleNoSpace,        CHECK_CHANGED,  OUTPUTS_CHANGED);
 	HookWidget(ui->simpleOutRecFormat,   COMBO_CHANGED,  OUTPUTS_CHANGED);
@@ -535,6 +540,12 @@ OBSBasicSettings::OBSBasicSettings(QWidget *parent)
 			this, SLOT(UpdateStreamDelayEstimate()));
 	connect(ui->outputMode, SIGNAL(currentIndexChanged(int)),
 			this, SLOT(UpdateStreamDelayEstimate()));
+//	connect(ui->outputMode1, SIGNAL(currentIndexChanged(int)),
+	//		this, SLOT(UpdateStreamDelayEstimate()));
+//	connect(ui->outputMode2, SIGNAL(currentIndexChanged(int)),
+	//		this, SLOT(UpdateStreamDelayEstimate()));
+//	connect(ui->outputMode3, SIGNAL(currentIndexChanged(int)),
+	//		this, SLOT(UpdateStreamDelayEstimate()));
 	connect(ui->simpleOutputVBitrate, SIGNAL(valueChanged(int)),
 			this, SLOT(UpdateStreamDelayEstimate()));
 	connect(ui->simpleOutputABitrate, SIGNAL(currentIndexChanged(int)),
@@ -775,16 +786,26 @@ void OBSBasicSettings::LoadServiceTypes()
 	const char    *type;
 	size_t        idx = 0;
 
+	//add ServiceTypes
 	while (obs_enum_service_types(idx++, &type)) {
 		const char *name = obs_service_get_display_name(type);
 		QString qName = QT_UTF8(name);
 		QString qType = QT_UTF8(type);
 
-		ui->streamType->addItem(qName, qType);
+		//ui->streamType->addItem(qName, qType);
+		ui->streamType1->addItem(qName, qType);
+		ui->streamType2->addItem(qName, qType);
+		ui->streamType3->addItem(qName, qType);
 	}
 
-	type = obs_service_get_type(main->GetService());
-	SetComboByValue(ui->streamType, type);
+	//type = obs_service_get_type(main->GetService()[0]);
+	type1 = obs_service_get_type(main->GetService()[0]);
+	type2 = obs_service_get_type(main->GetService()[1]);
+	type3 = obs_service_get_type(main->GetService()[2]);
+	//SetComboByValue(ui->streamType, type);
+	SetComboByValue(ui->streamType1, type1);
+	SetComboByValue(ui->streamType2, type2);
+	SetComboByValue(ui->streamType3, type3);
 }
 
 #define TEXT_USE_STREAM_ENC \
