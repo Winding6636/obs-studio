@@ -2926,11 +2926,11 @@ void OBSBasicSettings::SaveStream1Settings()
 			hotkeyData);
 
 	obs_data_release(hotkeyData);
-	if (!newService)
+	if (!newService[0])
 		return;
 
-	main->SetService(newService);
-	main->SaveService();
+	main->SetService(newService[0] , 0);
+	main->SaveService(0);
 	obs_service_release(newService);
 }
 
@@ -2949,7 +2949,7 @@ void OBSBasicSettings::SaveStream2Settings()
 ￼ 	obs_data_release(hotkeyData);
 ￼
 ￼ 	if (!newService[1])
-￼ 		continue;
+		return;
 ￼
 ￼ 	main->SetService(newService[1] , 1);
 ￼ 	main->SaveService(1);
@@ -2971,7 +2971,7 @@ void OBSBasicSettings::SaveStream2Settings()
 ￼ 	obs_data_release(hotkeyData);
 ￼
 ￼ 	if (!newService[2])
-￼ 		continue;
+ 		return;
 ￼
 ￼ 	main->SetService(newService[2] , 2);
 ￼ 	main->SaveService(2);
