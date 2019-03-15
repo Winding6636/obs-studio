@@ -116,7 +116,8 @@ enum obs_scale_type {
 	OBS_SCALE_POINT,
 	OBS_SCALE_BICUBIC,
 	OBS_SCALE_BILINEAR,
-	OBS_SCALE_LANCZOS
+	OBS_SCALE_LANCZOS,
+	OBS_SCALE_AREA,
 };
 
 /**
@@ -305,7 +306,7 @@ EXPORT const char *obs_get_version_string(void);
  * @param  argv  An array of command line arguments, copied from main() and ends
  *               with NULL.
  */
-EXPORT void obs_set_cmdline_args(int argc, char **argv);
+EXPORT void obs_set_cmdline_args(int argc, const char * const *argv);
 
 /**
  * Get the argc/argv used to start OBS
@@ -535,6 +536,9 @@ EXPORT audio_t *obs_get_audio(void);
 /** Gets the main video output handler for this OBS context */
 EXPORT video_t *obs_get_video(void);
 
+/** Returns true if video is active, false otherwise */
+EXPORT bool obs_video_active(void);
+
 /** Sets the primary output source for a channel. */
 EXPORT void obs_set_output_source(uint32_t channel, obs_source_t *source);
 
@@ -596,8 +600,10 @@ enum obs_base_effect {
 	OBS_EFFECT_SOLID,              /**< RGB/YUV (solid color only) */
 	OBS_EFFECT_BICUBIC,            /**< Bicubic downscale */
 	OBS_EFFECT_LANCZOS,            /**< Lanczos downscale */
+	OBS_EFFECT_AREA,               /**< Area rescale */
 	OBS_EFFECT_BILINEAR_LOWRES,    /**< Bilinear low resolution downscale */
 	OBS_EFFECT_PREMULTIPLIED_ALPHA,/**< Premultiplied alpha */
+	OBS_EFFECT_REPEAT,             /**< RGB/YUV (repeating) */
 };
 
 /** Returns a commonly used base effect */
@@ -670,6 +676,7 @@ enum obs_obj_type {
 EXPORT enum obs_obj_type obs_obj_get_type(void *obj);
 EXPORT const char *obs_obj_get_id(void *obj);
 EXPORT bool obs_obj_invalid(void *obj);
+EXPORT void *obs_obj_get_data(void *obj);
 
 typedef bool (*obs_enum_audio_device_cb)(void *data, const char *name,
 		const char *id);
@@ -709,6 +716,8 @@ EXPORT uint64_t obs_get_average_frame_time_ns(void);
 
 EXPORT uint32_t obs_get_total_frames(void);
 EXPORT uint32_t obs_get_lagged_frames(void);
+
+EXPORT bool obs_nv12_tex_active(void);
 
 EXPORT void obs_apply_private_data(obs_data_t *settings);
 EXPORT void obs_set_private_data(obs_data_t *settings);
@@ -1915,6 +1924,7 @@ EXPORT void *obs_encoder_get_type_data(obs_encoder_t *encoder);
 EXPORT const char *obs_encoder_get_id(const obs_encoder_t *encoder);
 
 EXPORT uint32_t obs_get_encoder_caps(const char *encoder_id);
+EXPORT uint32_t obs_encoder_get_caps(const obs_encoder_t *encoder);
 
 #ifndef SWIG
 /** Duplicates an encoder packet */
@@ -1929,6 +1939,9 @@ EXPORT void obs_free_encoder_packet(struct encoder_packet *packet);
 EXPORT void obs_encoder_packet_ref(struct encoder_packet *dst,
 		struct encoder_packet *src);
 EXPORT void obs_encoder_packet_release(struct encoder_packet *packet);
+
+EXPORT void *obs_encoder_create_rerouted(obs_encoder_t *encoder,
+		const char *reroute_id);
 
 
 /* ------------------------------------------------------------------------- */

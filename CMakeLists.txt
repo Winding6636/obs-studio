@@ -32,6 +32,16 @@ include(ObsHelpers)
 include(ObsCpack)
 include(GNUInstallDirs)
 
+if(WIN32)
+	string(REPLACE "-" ";" UI_VERSION_SPLIT ${OBS_VERSION})
+	list(GET UI_VERSION_SPLIT 0 UI_VERSION)
+	string(REPLACE "." ";" UI_VERSION_SEMANTIC ${UI_VERSION})
+	list(GET UI_VERSION_SEMANTIC 0 UI_VERSION_MAJOR)
+	list(GET UI_VERSION_SEMANTIC 1 UI_VERSION_MINOR)
+	list(GET UI_VERSION_SEMANTIC 2 UI_VERSION_PATCH)
+	configure_file(${CMAKE_CURRENT_SOURCE_DIR}/UI/obs.rc.in ${CMAKE_CURRENT_SOURCE_DIR}/UI/obs.rc)
+endif()
+
 # Must be a string in the format of "x.x.x-rcx"
 if(DEFINED RELEASE_CANDIDATE)
 	set(OBS_VERSION "${RELEASE_CANDIDATE}")
@@ -66,6 +76,10 @@ if(${CMAKE_C_COMPILER_ID} MATCHES "Clang" OR ${CMAKE_CXX_COMPILER_ID} MATCHES "C
 	set(CMAKE_COMPILER_IS_CLANG TRUE)
 endif()
 
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(powerpc|ppc)64le")
+	add_compile_definitions(NO_WARN_X86_INTRINSICS)
+endif()
+
 if(CMAKE_COMPILER_IS_GNUCC OR CMAKE_COMPILER_IS_GNUCXX OR CMAKE_COMPILER_IS_CLANG)
 	set(CMAKE_CXX_FLAGS "-Wall -Wextra -Wvla -Wno-unused-function -Werror-implicit-function-declaration -Wno-missing-field-initializers ${CMAKE_CXX_FLAGS} -fno-strict-aliasing")
 	set(CMAKE_C_FLAGS "-Wall -Wextra -Wvla -Wno-unused-function -Werror-implicit-function-declaration -Wno-missing-braces -Wno-missing-field-initializers ${CMAKE_C_FLAGS} -std=gnu99 -fno-strict-aliasing")
@@ -90,6 +104,7 @@ if(WIN32)
 endif()
 
 if(MSVC)
+	add_compile_options("/MP")
 	set(CMAKE_C_FLAGS_DEBUG "/DDEBUG=1 /D_DEBUG=1 ${CMAKE_C_FLAGS_DEBUG}")
 	set(CMAKE_CXX_FLAGS_DEBUG "/DDEBUG=1 /D_DEBUG=1 ${CMAKE_C_FLAGS_DEBUG}")
 

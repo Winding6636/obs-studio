@@ -282,7 +282,11 @@ OBSBasicSettings::OBSBasicSettings(QWidget *parent)
 {
 	string path;
 
+	EnableThreadedMessageBoxes(true);
+
 	ui->setupUi(this);
+
+	setWindowFlags(windowFlags() & ~Qt::WindowContextHelpButtonHint);
 
 	main->EnableOutputs(false);
 
@@ -318,17 +322,25 @@ OBSBasicSettings::OBSBasicSettings(QWidget *parent)
 	HookWidget(ui->centerSnapping,       CHECK_CHANGED,  GENERAL_CHANGED);
 	HookWidget(ui->sourceSnapping,       CHECK_CHANGED,  GENERAL_CHANGED);
 	HookWidget(ui->snapDistance,         DSCROLL_CHANGED,GENERAL_CHANGED);
+	HookWidget(ui->overflowHide,         CHECK_CHANGED,  GENERAL_CHANGED);
+	HookWidget(ui->overflowAlwaysVisible,CHECK_CHANGED,  GENERAL_CHANGED);
+	HookWidget(ui->overflowSelectionHide,CHECK_CHANGED,  GENERAL_CHANGED);
 	HookWidget(ui->doubleClickSwitch,    CHECK_CHANGED,  GENERAL_CHANGED);
 	HookWidget(ui->studioPortraitLayout, CHECK_CHANGED,  GENERAL_CHANGED);
+	HookWidget(ui->prevProgLabelToggle,  CHECK_CHANGED,  GENERAL_CHANGED);
 	HookWidget(ui->multiviewMouseSwitch, CHECK_CHANGED,  GENERAL_CHANGED);
 	HookWidget(ui->multiviewDrawNames,   CHECK_CHANGED,  GENERAL_CHANGED);
 	HookWidget(ui->multiviewDrawAreas,   CHECK_CHANGED,  GENERAL_CHANGED);
 	HookWidget(ui->multiviewLayout,      COMBO_CHANGED,  GENERAL_CHANGED);
+	HookWidget(ui->service,              COMBO_CHANGED,  STREAM1_CHANGED);
+	HookWidget(ui->server,               COMBO_CHANGED,  STREAM1_CHANGED);
+	HookWidget(ui->customServer,         EDIT_CHANGED,   STREAM1_CHANGED);
+	HookWidget(ui->key,                  EDIT_CHANGED,   STREAM1_CHANGED);
+	HookWidget(ui->bandwidthTestEnable,  CHECK_CHANGED,  STREAM1_CHANGED);
+	HookWidget(ui->useAuth,              CHECK_CHANGED,  STREAM1_CHANGED);
+	HookWidget(ui->authUsername,         EDIT_CHANGED,   STREAM1_CHANGED);
+	HookWidget(ui->authPw,               EDIT_CHANGED,   STREAM1_CHANGED);
 	HookWidget(ui->outputMode,           COMBO_CHANGED,  OUTPUTS_CHANGED);
-	//HookWidget(ui->streamType,           COMBO_CHANGED,  STREAM1_CHANGED);
-	HookWidget(ui->streamType1,           COMBO_CHANGED,  STREAM1_CHANGED);
-	HookWidget(ui->streamType2,           COMBO_CHANGED,  STREAM2_CHANGED);
-	HookWidget(ui->streamType3,           COMBO_CHANGED,  STREAM3_CHANGED);
 	HookWidget(ui->simpleOutputPath,     EDIT_CHANGED,   OUTPUTS_CHANGED);
 	HookWidget(ui->simpleNoSpace,        CHECK_CHANGED,  OUTPUTS_CHANGED);
 	HookWidget(ui->simpleOutRecFormat,   COMBO_CHANGED,  OUTPUTS_CHANGED);
@@ -571,7 +583,6 @@ OBSBasicSettings::OBSBasicSettings(QWidget *parent)
 
 	installEventFilter(CreateShortcutFilter());
 
-	LoadServiceTypes();
 	LoadEncoderTypes();
 	LoadColorRanges();
 	LoadFormats();
@@ -702,6 +713,7 @@ OBSBasicSettings::OBSBasicSettings(QWidget *parent)
 
 	obs_properties_destroy(ppts);
 
+	InitStreamPage();
 	LoadSettings(false);
 
 	// Add warning checks to advanced output recording section controls
@@ -735,6 +747,8 @@ OBSBasicSettings::~OBSBasicSettings()
 	delete ui->filenameFormatting->completer();
 	main->EnableOutputs(true);
 	App()->EnableInFocusHotkeys(!disableHotkeysInFocus);
+
+	EnableThreadedMessageBoxes(false);
 }
 
 void OBSBasicSettings::SaveCombo(QComboBox *widget, const char *section,
@@ -779,49 +793,6 @@ void OBSBasicSettings::SaveSpinBox(QSpinBox *widget, const char *section,
 {
 	if (WidgetChanged(widget))
 		config_set_int(main->Config(), section, value, widget->value());
-}
-
-void OBSBasicSettings::LoadServiceTypes()
-{
-	const char    *type1;
- 	const char    *type2;
- 	const char    *type3;
-	size_t        idx1 = 0;
-	size_t        idx2 = 0;
-	size_t        idx3 = 0;
-
-	//add ServiceTypes
-	while (obs_enum_service_types(idx1++, &type1)) {
-		const char *name = obs_service_get_display_name(type1);
-		QString qName = QT_UTF8(name);
-		QString qType = QT_UTF8(type1);
-
-		//ui->streamType->addItem(qName, qType);
-		ui->streamType1->addItem(qName, qType);
-	}
-	while (obs_enum_service_types(idx2++, &type2)) {
-		const char *name = obs_service_get_display_name(type2);
-		QString qName = QT_UTF8(name);
-		QString qType = QT_UTF8(type2);
- 		//ui->streamType->addItem(qName, qType);
-		ui->streamType2->addItem(qName, qType);
-	}
-	while (obs_enum_service_types(idx3++, &type3)) {
-		const char *name = obs_service_get_display_name(type3);
-		QString qName = QT_UTF8(name);
-		QString qType = QT_UTF8(type3);
- 		//ui->streamType->addItem(qName, qType);
-		ui->streamType3->addItem(qName, qType);
-	}
-
-	//type = obs_service_get_type(main->GetService()[0]);
-	type1 = obs_service_get_type(main->GetService()[0]);
-	type2 = obs_service_get_type(main->GetService()[1]);
-	type3 = obs_service_get_type(main->GetService()[2]);
-	//SetComboByValue(ui->streamType, type);
-	SetComboByValue(ui->streamType1, type1);
-	SetComboByValue(ui->streamType2, type2);
-	SetComboByValue(ui->streamType3, type3);
 }
 
 #define TEXT_USE_STREAM_ENC \
@@ -1139,6 +1110,18 @@ void OBSBasicSettings::LoadGeneralSettings()
 			"BasicWindow", "ProjectorAlwaysOnTop");
 	ui->projectorAlwaysOnTop->setChecked(projectorAlwaysOnTop);
 
+	bool overflowHide = config_get_bool(GetGlobalConfig(),
+		"BasicWindow", "OverflowHidden");
+	ui->overflowHide->setChecked(overflowHide);
+
+	bool overflowAlwaysVisible = config_get_bool(GetGlobalConfig(),
+		"BasicWindow", "OverflowAlwaysVisible");
+	ui->overflowAlwaysVisible->setChecked(overflowAlwaysVisible);
+
+	bool overflowSelectionHide = config_get_bool(GetGlobalConfig(),
+		"BasicWindow", "OverflowSelectionHidden");
+	ui->overflowSelectionHide->setChecked(overflowSelectionHide);
+
 	bool doubleClickSwitch = config_get_bool(GetGlobalConfig(),
 			"BasicWindow", "TransitionOnDoubleClick");
 	ui->doubleClickSwitch->setChecked(doubleClickSwitch);
@@ -1146,6 +1129,10 @@ void OBSBasicSettings::LoadGeneralSettings()
 	bool studioPortraitLayout = config_get_bool(GetGlobalConfig(),
 			"BasicWindow", "StudioPortraitLayout");
 	ui->studioPortraitLayout->setChecked(studioPortraitLayout);
+
+	bool prevProgLabels = config_get_bool(GetGlobalConfig(),
+			"BasicWindow", "StudioModeLabels");
+	ui->prevProgLabelToggle->setChecked(prevProgLabels);
 
 	bool multiviewMouseSwitch = config_get_bool(GetGlobalConfig(),
 			"BasicWindow", "MultiviewMouseSwitch");
@@ -1182,79 +1169,6 @@ void OBSBasicSettings::LoadGeneralSettings()
 	loading = false;
 
 }
-
-void OBSBasicSettings::LoadStream1Settings()
-{
-	QLayout *layout = ui->streamType1group->layout();
-	obs_service_t *service = main->GetService();
-	const char *type = obs_service_get_type(service);
-
-	loading = true;
-
-	const char *type = obs_service_get_type(service[0]);
-	obs_data_t *settings = obs_service_get_settings(service[0]);
-	delete streamProperties[0];
-	streamProperties[0] = new OBSPropertiesView(settings, type,(PropertiesReloadCallback)obs_get_service_properties,170);
-
-	streamProperties[0]->setProperty("changed", QVariant(false));
-	layout->addWidget(streamProperties[0]);
-
-	QObject::connect(streamProperties[0], SIGNAL(Changed()),this, STREAM1_CHANGED);
-	obs_data_release(settings);
-
-	loading = false;
-
-	if (main->StreamingActive()) {
-		ui->streamType1->setEnabled(false);
-		ui->streamType1group->setEnabled(false);
-	}
-}
-
-void OBSBasicSettings::LoadStream2Settings()
-{
-	printf("**************OBSBasicSettings::LoadStream2Settings()**************** \n");
-	printf("****	here is where the stream properties widgets are created****** \n");
-	printf("********************************************************************* \n");
-	QLayout *layout = ui->streamType2group->layout();
-	obs_service_t ** service = main->GetService();
-	loading = true;
- 	const char *type = obs_service_get_type(service[1]);
-	obs_data_t *settings = obs_service_get_settings(service[1]);
-	delete streamProperties[1];
-	streamProperties[1] = new OBSPropertiesView(settings, type,(PropertiesReloadCallback)obs_get_service_properties,170);
- 	streamProperties[1]->setProperty("changed", QVariant(false));
-	layout->addWidget(streamProperties[1]);
- 	QObject::connect(streamProperties[1], SIGNAL(Changed()),this, STREAM2_CHANGED);
-	obs_data_release(settings);
- 	loading = false;
- 	if (main->StreamingActive()) {
-		ui->streamType2->setEnabled(false);
-		ui->streamType2group->setEnabled(false);
-	}
-}
- void OBSBasicSettings::LoadStream3Settings()
-{
-	printf("**************OBSBasicSettings::LoadStream3Settings()**************** \n");
-	printf("****	here is where the stream properties widgets are created****** \n");
-	printf("********************************************************************* \n");
-	QLayout *layout = ui->streamType3group->layout();
-	obs_service_t ** service = main->GetService();
-	loading = true;
- 	const char *type = obs_service_get_type(service[2]);
-	obs_data_t *settings = obs_service_get_settings(service[2]);
-	delete streamProperties[2];
-	streamProperties[2] = new OBSPropertiesView(settings, type,(PropertiesReloadCallback)obs_get_service_properties,170);
- 	streamProperties[2]->setProperty("changed", QVariant(false));
-	layout->addWidget(streamProperties[2]);
- 	QObject::connect(streamProperties[2], SIGNAL(Changed()),this, STREAM3_CHANGED);
-	obs_data_release(settings);
- 	loading = false;
- 	if (main->StreamingActive()) {
-		ui->streamType3->setEnabled(false);
-		ui->streamType3group->setEnabled(false);
-	}
-}
-
 
 void OBSBasicSettings::LoadRendererList()
 {
@@ -1409,6 +1323,9 @@ void OBSBasicSettings::LoadDownscaleFilters()
 	ui->downscaleFilter->addItem(
 			QTStr("Basic.Settings.Video.DownscaleFilter.Lanczos"),
 			QT_UTF8("lanczos"));
+	ui->downscaleFilter->addItem(
+			QTStr("Basic.Settings.Video.DownscaleFilter.Area"),
+			QT_UTF8("area"));
 
 	const char *scaleType = config_get_string(main->Config(),
 			"Video", "ScaleType");
@@ -1417,6 +1334,8 @@ void OBSBasicSettings::LoadDownscaleFilters()
 		ui->downscaleFilter->setCurrentIndex(0);
 	else if (astrcmpi(scaleType, "lanczos") == 0)
 		ui->downscaleFilter->setCurrentIndex(2);
+	else if (astrcmpi(scaleType, "area") == 0)
+		ui->downscaleFilter->setCurrentIndex(3);
 	else
 		ui->downscaleFilter->setCurrentIndex(1);
 }
@@ -1499,7 +1418,7 @@ void OBSBasicSettings::LoadVideoSettings()
 {
 	loading = true;
 
-	if (video_output_active(obs_get_video())) {
+	if (obs_video_active()) {
 		ui->videoPage->setEnabled(false);
 		ui->videoMsg->setText(
 				QTStr("Basic.Settings.Video.CurrentlyActive"));
@@ -1989,7 +1908,7 @@ void OBSBasicSettings::LoadOutputSettings()
 	LoadAdvOutputFFmpegSettings();
 	LoadAdvOutputAudioSettings();
 
-	if (video_output_active(obs_get_video())) {
+	if (obs_video_active()) {
 		ui->outputMode->setEnabled(false);
 		//ui->outputMode1->setEnabled(false);
 		//ui->outputMode2->setEnabled(false);
@@ -2063,7 +1982,7 @@ void OBSBasicSettings::LoadListValues(QComboBox *widget, obs_property_t *prop,
 			deviceId = obs_data_get_string(settings, "device_id");
 	}
 
-	widget->addItem(QTStr("Disabled"), "disabled");
+	widget->addItem(QTStr("Basic.Settings.Audio.Disabled"), "disabled");
 
 	for (size_t i = 0; i < count; i++) {
 		const char *name = obs_property_list_item_name(prop, i);
@@ -2374,7 +2293,7 @@ void OBSBasicSettings::LoadAdvancedSettings()
 	if (!SetComboByValue(ui->bindToIP, bindIP))
 		SetInvalidValue(ui->bindToIP, bindIP, bindIP);
 
-	if (video_output_active(obs_get_video())) {
+	if (obs_video_active()) {
 		ui->advancedVideoContainer->setEnabled(false);
 	}
 
@@ -2816,6 +2735,18 @@ void OBSBasicSettings::SaveGeneralSettings()
 		config_set_double(GetGlobalConfig(), "BasicWindow",
 				"SnapDistance",
 				ui->snapDistance->value());
+	if (WidgetChanged(ui->overflowAlwaysVisible))
+		config_set_bool(GetGlobalConfig(), "BasicWindow",
+			"OverflowAlwaysVisible",
+			ui->overflowAlwaysVisible->isChecked());
+	if (WidgetChanged(ui->overflowHide))
+		config_set_bool(GetGlobalConfig(), "BasicWindow",
+			"OverflowHidden",
+			ui->overflowHide->isChecked());
+	if (WidgetChanged(ui->overflowSelectionHide))
+		config_set_bool(GetGlobalConfig(), "BasicWindow",
+			"OverflowSelectionHidden",
+			ui->overflowSelectionHide->isChecked());
 	if (WidgetChanged(ui->doubleClickSwitch))
 		config_set_bool(GetGlobalConfig(), "BasicWindow",
 				"TransitionOnDoubleClick",
@@ -2881,6 +2812,14 @@ void OBSBasicSettings::SaveGeneralSettings()
 		main->ResetUI();
 	}
 
+	if (WidgetChanged(ui->prevProgLabelToggle)) {
+		config_set_bool(GetGlobalConfig(), "BasicWindow",
+				"StudioModeLabels",
+				ui->prevProgLabelToggle->isChecked());
+
+		main->ResetUI();
+	}
+
 	bool multiviewChanged = false;
 	if (WidgetChanged(ui->multiviewMouseSwitch)) {
 		config_set_bool(GetGlobalConfig(), "BasicWindow",
@@ -2913,72 +2852,6 @@ void OBSBasicSettings::SaveGeneralSettings()
 	if (multiviewChanged)
 		OBSProjector::UpdateMultiviewProjectors();
 }
-
-void OBSBasicSettings::SaveStream1Settings()
-{
-	printf("********************OBSBasicSettings::SaveStream1Settings()***************** \n");
-
-	QString streamType = GetComboData(ui->streamType1);
-
-	obs_service_t *oldService = main->GetService();
-	obs_data_t *hotkeyData = obs_hotkeys_save_service(oldService);
-
-	newService[0] = obs_service_create(QT_TO_UTF8(streamType),
-			"default_service", streamProperties[0]->GetSettings(),
-			hotkeyData);
-
-	obs_data_release(hotkeyData);
-	if (!newService[0])
-		return;
-
-	main->SetService(newService[0] , 0);
-	main->SaveService(0);
-	obs_service_release(newService);
-}
-
-void OBSBasicSettings::SaveStream2Settings()
-{
-	printf("********************OBSBasicSettings::SaveStream2Settings()***************** \n");
-	QString streamType = GetComboData(ui->streamType2);
-	obs_service_t* newService[NUMBER_OF_STREAM_SERVERS];
-	obs_service_t** oldService = main->GetService();
-	obs_data_t *hotkeyData = obs_hotkeys_save_service(oldService[1]);
-
-	newService[1] = obs_service_create(QT_TO_UTF8(streamType),
-￼ 			"default_service", streamProperties[1]->GetSettings(),
-￼ 			hotkeyData);
-￼
-￼ 	obs_data_release(hotkeyData);
-￼
-￼ 	if (!newService[1])
-		return;
-￼
-￼ 	main->SetService(newService[1] , 1);
-￼ 	main->SaveService(1);
-￼ 	obs_service_release(newService[1]);
-￼ }
-￼
-￼ void OBSBasicSettings::SaveStream3Settings()
-￼ {
-￼ 	printf("********************OBSBasicSettings::SaveStream3Settings()***************** \n");
-￼ 	QString streamType = GetComboData(ui->streamType3);
-￼ 	obs_service_t* newService[NUMBER_OF_STREAM_SERVERS];
-￼ 	obs_service_t** oldService = main->GetService();
-￼ 	obs_data_t *hotkeyData = obs_hotkeys_save_service(oldService[2]);
-￼
-￼ 	newService[2] = obs_service_create(QT_TO_UTF8(streamType),
-￼ 			"default_service", streamProperties[2]->GetSettings(),
-￼ 			hotkeyData);
-￼
-￼ 	obs_data_release(hotkeyData);
-￼
-￼ 	if (!newService[2])
- 		return;
-￼
-￼ 	main->SetService(newService[2] , 2);
-￼ 	main->SaveService(2);
-￼ 	obs_service_release(newService[2]);
-￼ }
 
 void OBSBasicSettings::SaveVideoSettings()
 {
@@ -3604,66 +3477,6 @@ void OBSBasicSettings::on_buttonBox_clicked(QAbstractButton *button)
 	}
 }
 
-void OBSBasicSettings::on_streamType1_currentIndexChanged(int idx)
-{
-	if (loading)
-		return;
-
-	QLayout *layout = ui->streamType1group->layout();
-	QString streamType = ui->streamType1->itemData(idx).toString();
-	obs_data_t *settings = obs_service_defaults(QT_TO_UTF8(streamType));
-
-	delete streamProperties[0];
-	streamProperties[0] = new OBSPropertiesView(settings,QT_TO_UTF8(streamType),(PropertiesReloadCallback)obs_get_service_properties,170);
-
-	streamProperties[0]->setProperty("changed", QVariant(true));
-	layout->addWidget(streamProperties[0]);
-
-	QObject::connect(streamProperties[0], SIGNAL(Changed()),this, STREAM1_CHANGED);
-	
-	obs_data_release(settings);
-}
-
-void OBSBasicSettings::on_streamType2_currentIndexChanged(int idx)
-￼ {
-￼ 	if (loading)
-￼ 		return;
-￼
-￼ 	QLayout *layout = ui->streamType2group->layout();
-￼ 	QString streamType = ui->streamType2->itemData(idx).toString();
-￼ 	obs_data_t *settings = obs_service_defaults(QT_TO_UTF8(streamType));
-￼
-￼ 	delete streamProperties[1];
-￼ 	streamProperties[1] = new OBSPropertiesView(settings,QT_TO_UTF8(streamType),(PropertiesReloadCallback)obs_get_service_properties,170);
-￼
-￼ 	streamProperties[1]->setProperty("changed", QVariant(true));
-￼ 	layout->addWidget(streamProperties[1]);
-￼
-￼ 	QObject::connect(streamProperties[1], SIGNAL(Changed()),this, STREAM2_CHANGED);
-￼
-￼ 	obs_data_release(settings);
-￼ }
-￼
-￼ void OBSBasicSettings::on_streamType3_currentIndexChanged(int idx)
-￼ {
-￼ 	if (loading)
-￼ 		return;
-￼
-￼ 	QLayout *layout = ui->streamType3group->layout();
-￼ 	QString streamType = ui->streamType3->itemData(idx).toString();
-￼ 	obs_data_t *settings = obs_service_defaults(QT_TO_UTF8(streamType));
-￼
-￼ 	delete streamProperties[2];
-￼ 	streamProperties[2] = new OBSPropertiesView(settings,QT_TO_UTF8(streamType),(PropertiesReloadCallback)obs_get_service_properties,170);
-￼
-￼ 	streamProperties[2]->setProperty("changed", QVariant(true));
-￼ 	layout->addWidget(streamProperties[2]);
-￼
-￼ 	QObject::connect(streamProperties[2], SIGNAL(Changed()),this, STREAM3_CHANGED);
-￼
-￼ 	obs_data_release(settings);
-￼ }
-
 void OBSBasicSettings::on_simpleOutputBrowse_clicked()
 {
 	QString dir = QFileDialog::getExistingDirectory(this,
@@ -3705,35 +3518,50 @@ void OBSBasicSettings::on_advOutFFPathBrowse_clicked()
 
 void OBSBasicSettings::on_advOutEncoder_currentIndexChanged(int idx)
 {
-	if (loading)
-		return;
-
 	QString encoder = GetComboData(ui->advOutEncoder);
-	bool loadSettings = encoder == curAdvStreamEncoder;
+	if (!loading) {
+		bool loadSettings = encoder == curAdvStreamEncoder;
 
-	delete streamEncoderProps;
-	streamEncoderProps = CreateEncoderPropertyView(QT_TO_UTF8(encoder),
-			loadSettings ? "streamEncoder.json" : nullptr, true);
-	ui->advOutputStreamTab->layout()->addWidget(streamEncoderProps);
+		delete streamEncoderProps;
+		streamEncoderProps = CreateEncoderPropertyView(
+				QT_TO_UTF8(encoder),
+				loadSettings ? "streamEncoder.json" : nullptr,
+				true);
+		ui->advOutputStreamTab->layout()->addWidget(streamEncoderProps);
+	}
+
+	uint32_t caps = obs_get_encoder_caps(QT_TO_UTF8(encoder));
+
+	if (caps & OBS_ENCODER_CAP_PASS_TEXTURE) {
+		ui->advOutUseRescale->setChecked(false);
+		ui->advOutUseRescale->setVisible(false);
+		ui->advOutRescale->setVisible(false);
+	} else {
+		ui->advOutUseRescale->setVisible(true);
+		ui->advOutRescale->setVisible(true);
+	}
 
 	UNUSED_PARAMETER(idx);
 }
 
 void OBSBasicSettings::on_advOutRecEncoder_currentIndexChanged(int idx)
 {
-	if (loading)
+	if (!loading) {
+		delete recordEncoderProps;
+		recordEncoderProps = nullptr;
+	}
+
+	if (idx <= 0) {
+		ui->advOutRecUseRescale->setChecked(false);
+		ui->advOutRecUseRescale->setVisible(false);
+		ui->advOutRecRescaleContainer->setVisible(false);
 		return;
+	}
 
-	ui->advOutRecUseRescale->setEnabled(idx > 0);
-	ui->advOutRecRescaleContainer->setEnabled(idx > 0);
+	QString encoder = GetComboData(ui->advOutRecEncoder);
+	bool loadSettings = encoder == curAdvRecordEncoder;
 
-	delete recordEncoderProps;
-	recordEncoderProps = nullptr;
-
-	if (idx > 0) {
-		QString encoder = GetComboData(ui->advOutRecEncoder);
-		bool loadSettings = encoder == curAdvRecordEncoder;
-
+	if (!loading) {
 		recordEncoderProps = CreateEncoderPropertyView(
 				QT_TO_UTF8(encoder),
 				loadSettings ? "recordEncoder.json" : nullptr,
@@ -3741,6 +3569,17 @@ void OBSBasicSettings::on_advOutRecEncoder_currentIndexChanged(int idx)
 		ui->advOutRecStandard->layout()->addWidget(recordEncoderProps);
 		connect(recordEncoderProps, SIGNAL(Changed()),
 				this, SLOT(AdvReplayBufferChanged()));
+	}
+
+	uint32_t caps = obs_get_encoder_caps(QT_TO_UTF8(encoder));
+
+	if (caps & OBS_ENCODER_CAP_PASS_TEXTURE) {
+		ui->advOutRecUseRescale->setChecked(false);
+		ui->advOutRecUseRescale->setVisible(false);
+		ui->advOutRecRescaleContainer->setVisible(false);
+	} else {
+		ui->advOutRecUseRescale->setVisible(true);
+		ui->advOutRecRescaleContainer->setVisible(true);
 	}
 }
 
@@ -4128,7 +3967,8 @@ void OBSBasicSettings::AdvOutRecCheckWarnings()
 		warningMsg = QTStr("OutputWarnings.MultiTrackRecording");
 	}
 
-	if (ui->advOutRecFormat->currentText().compare("mp4") == 0) {
+	if (ui->advOutRecFormat->currentText().compare("mp4") == 0 ||
+	    ui->advOutRecFormat->currentText().compare("mov") == 0) {
 		if (!warningMsg.isEmpty())
 			warningMsg += "\n\n";
 		warningMsg += QTStr("OutputWarnings.MP4Recording");
@@ -4215,7 +4055,7 @@ void OBSBasicSettings::UpdateStreamDelayEstimate()
 	UpdateAutomaticReplayBufferCheckboxes();
 }
 
-static bool EncoderAvailable(const char *encoder)
+bool EncoderAvailable(const char *encoder)
 {
 	const char *val;
 	int i = 0;
@@ -4531,11 +4371,7 @@ void OBSBasicSettings::SimpleRecordingEncoderChanged()
 	OBSService service;
 
 	if (stream1Changed) {
-		QString streamType = GetComboData(ui->streamType1);
-		service = obs_service_create_private(
-				QT_TO_UTF8(streamType), nullptr,
-				streamProperties->GetSettings());
-		obs_service_release(service);
+		service = SpawnTempService();
 	} else {
 		service = main->GetService();
 	}
@@ -4591,7 +4427,8 @@ void OBSBasicSettings::SimpleRecordingEncoderChanged()
 		}
 	}
 
-	if (ui->simpleOutRecFormat->currentText().compare("mp4") == 0) {
+	if (ui->simpleOutRecFormat->currentText().compare("mp4") == 0 ||
+	    ui->simpleOutRecFormat->currentText().compare("mov") == 0) {
 		if (!warning.isEmpty())
 			warning += "\n\n";
 		warning += QTStr("OutputWarnings.MP4Recording");
@@ -4697,4 +4534,39 @@ void OBSBasicSettings::on_disableOSXVSync_clicked()
 		ui->resetOSXVSync->setEnabled(disable);
 	}
 #endif
+}
+
+void OBSBasicSettings::SetGeneralIcon(const QIcon &icon)
+{
+	ui->listWidget->item(0)->setIcon(icon);
+}
+
+void OBSBasicSettings::SetStreamIcon(const QIcon &icon)
+{
+	ui->listWidget->item(1)->setIcon(icon);
+}
+
+void OBSBasicSettings::SetOutputIcon(const QIcon &icon)
+{
+	ui->listWidget->item(2)->setIcon(icon);
+}
+
+void OBSBasicSettings::SetAudioIcon(const QIcon &icon)
+{
+	ui->listWidget->item(3)->setIcon(icon);
+}
+
+void OBSBasicSettings::SetVideoIcon(const QIcon &icon)
+{
+	ui->listWidget->item(4)->setIcon(icon);
+}
+
+void OBSBasicSettings::SetHotkeysIcon(const QIcon &icon)
+{
+	ui->listWidget->item(5)->setIcon(icon);
+}
+
+void OBSBasicSettings::SetAdvancedIcon(const QIcon &icon)
+{
+	ui->listWidget->item(6)->setIcon(icon);
 }

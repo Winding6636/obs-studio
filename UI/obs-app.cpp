@@ -418,6 +418,8 @@ bool OBSApp::InitGlobalConfigDefaults()
 			"ShowListboxToolbars", true);
 	config_set_default_bool(globalConfig, "BasicWindow",
 			"ShowStatusBar", true);
+	config_set_default_bool(globalConfig, "BasicWindow",
+			"StudioModeLabels", true);
 
 	if (!config_get_bool(globalConfig, "General", "Pre21Defaults")) {
 		config_set_default_string(globalConfig, "General",
@@ -707,6 +709,17 @@ bool OBSApp::InitGlobalConfig()
 		    lastVersion < MAKE_SEMANTIC_VERSION(21, 0, 0);
 
 		config_set_bool(globalConfig, "General", "Pre21Defaults",
+				useOldDefaults);
+		changed = true;
+	}
+
+	if (!config_has_user_value(globalConfig, "General", "Pre23Defaults")) {
+		uint32_t lastVersion = config_get_int(globalConfig, "General",
+				"LastVersion");
+		bool useOldDefaults = lastVersion &&
+		    lastVersion < MAKE_SEMANTIC_VERSION(23, 0, 0);
+
+		config_set_bool(globalConfig, "General", "Pre23Defaults",
 				useOldDefaults);
 		changed = true;
 	}
@@ -1161,6 +1174,20 @@ void OBSApp::AppInit()
 	config_set_default_string(globalConfig, "Basic", "SceneCollectionFile",
 			Str("Untitled"));
 
+	if (!config_has_user_value(globalConfig, "Basic", "Profile")) {
+		config_set_string(globalConfig, "Basic", "Profile",
+				Str("Untitled"));
+		config_set_string(globalConfig, "Basic", "ProfileDir",
+				Str("Untitled"));
+	}
+
+	if (!config_has_user_value(globalConfig, "Basic", "SceneCollection")) {
+		config_set_string(globalConfig, "Basic",
+				"SceneCollection", Str("Untitled"));
+		config_set_string(globalConfig, "Basic",
+				"SceneCollectionFile", Str("Untitled"));
+	}
+
 #ifdef _WIN32
 	bool disableAudioDucking = config_get_bool(globalConfig, "Audio",
 			"DisableAudioDucking");
@@ -1214,11 +1241,20 @@ void OBSApp::EnableInFocusHotkeys(bool enable)
 	ResetHotkeyState(applicationState() != Qt::ApplicationActive);
 }
 
+Q_DECLARE_METATYPE(VoidFunc)
+
+void OBSApp::Exec(VoidFunc func)
+{
+	func();
+}
+
 bool OBSApp::OBSInit()
 {
 	ProfileScope("OBSApp::OBSInit");
 
 	setAttribute(Qt::AA_UseHighDpiPixmaps);
+
+	qRegisterMetaType<VoidFunc>();
 
 	if (!StartupOBS(locale.c_str(), GetProfilerNameStore()))
 		return false;
@@ -1231,6 +1267,8 @@ bool OBSApp::OBSInit()
 	obs_data_set_bool(settings, "BrowserHWAccel", browserHWAccel);
 	obs_apply_private_data(settings);
 	obs_data_release(settings);
+
+	blog(LOG_INFO, "Current Date/Time: %s", CurrentDateTimeString().c_str());
 
 	blog(LOG_INFO, "Browser Hardware Acceleration: %s",
 			browserHWAccel ? "true" : "false");
@@ -1645,6 +1683,10 @@ static int run_program(fstream &logFile, int argc, char *argv[])
 	profile_register_root(run_program_init, 0);
 
 	ScopeProfiler prof{run_program_init};
+
+#if (QT_VERSION >= QT_VERSION_CHECK(5, 11, 0))
+	QGuiApplication::setAttribute(Qt::AA_EnableHighDpiScaling);
+#endif
 
 	QCoreApplication::addLibraryPath(".");
 

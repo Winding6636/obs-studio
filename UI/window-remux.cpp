@@ -459,6 +459,9 @@ QVariant RemuxQueueModel::getIcon(RemuxEntryState state)
 		icon = style->standardIcon(
 			QStyle::SP_MessageBoxWarning);
 		break;
+
+	default:
+		break;
 	}
 
 	return icon;
@@ -479,7 +482,7 @@ void RemuxQueueModel::checkInputPath(int row)
 
 		if (entry.state == RemuxEntryState::Ready)
 			entry.targetPath = fileInfo.path() + QDir::separator()
-				+ fileInfo.baseName() + ".mp4";
+				+ fileInfo.completeBaseName() + ".mp4";
 	}
 
 	if (entry.state == RemuxEntryState::Ready && isProcessing)
@@ -943,7 +946,6 @@ void OBSRemux::remuxFinished(bool success)
 	queueModel->finishEntry(success);
 
 	if (autoRemux && autoRemuxFile != "") {
-		QFile::remove(autoRemuxFile);
 		QTimer::singleShot(3000, this, SLOT(close()));
 	}
 
